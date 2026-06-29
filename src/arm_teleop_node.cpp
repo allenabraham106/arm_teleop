@@ -6,12 +6,12 @@ constexpr int CONTROL_MODE_VELOCITY  = 2;
 constexpr int INPUT_MODE_PASSTHROUGH = 1;
 
 const std::vector<std::string> JOINT_TOPICS = {
-  "/odrive_axis0/control_message",  // J1 - base
-  "/odrive_axis1/control_message",  // J2 - shoulder
-  "/odrive_axis2/control_message",  // J3 - elbow
-  "/odrive_axis3/control_message",  // J4 - forearm
-  "/odrive_axis4/control_message",  // J5 - wrist pitch
-  "/odrive_axis5/control_message",  // J6 - wrist roll
+  "/odrive_node_0/control_message",  // J1 - base
+  "/odrive_node_1/control_message",  // J2 - shoulder
+  "/odrive_node_2/control_message",  // J3 - elbow
+  "/odrive_node_3/control_message",  // J4 - forearm
+  "/odrive_node_4/control_message",  // J5 - wrist pitch
+  "/odrive_node_5/control_message",  // J6 - wrist roll
 };
 
 class ArmTeleopNode : public rclcpp::Node
