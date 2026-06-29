@@ -12,13 +12,21 @@ find_package(odrive_can REQUIRED)
 
 add_executable(arm_teleop_node src/arm_teleop_node.cpp)
 
+add_executable(arm_joint_sim_node src/arm_joint_sim_node.cpp)
+
+ament_target_dependencies(arm_joint_sim_node
+  rclcpp
+  sensor_msgs
+  odrive_can
+)
+
 ament_target_dependencies(arm_teleop_node
   rclcpp
   sensor_msgs
   odrive_can
 )
 
-install(TARGETS arm_teleop_node
+install(TARGETS arm_teleop_node arm_joint_sim_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
