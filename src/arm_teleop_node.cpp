@@ -38,11 +38,10 @@ class ArmTeleopNode : public rclcpp::Node{
       this->declare_parameter("btn_speed",  4);
 
       // Velocity params
-      this->declare_parameter("max_velocity_slow", 0.5);
-      this->declare_parameter("max_velocity_fast", 1.5);
       this->declare_parameter("deadband",          0.08);
       this->declare_parameter("dpad_velocity",     0.3);
       this->declare_parameter("gripper_velocity",  0.5);
+      this->declare_parameter("max_velocity", 1.5);
 
       // Load axis indices
       axis_left_x_  = this->get_parameter("axis_left_x").as_int();
@@ -61,11 +60,11 @@ class ArmTeleopNode : public rclcpp::Node{
       btn_speed_  = this->get_parameter("btn_speed").as_int();
 
       // Load velocity params
-      max_vel_slow_   = this->get_parameter("max_velocity_slow").as_double();
-      max_vel_fast_   = this->get_parameter("max_velocity_fast").as_double();
-      deadband_       = this->get_parameter("deadband").as_double();
-      dpad_vel_       = this->get_parameter("dpad_velocity").as_double();
-      gripper_vel_    = this->get_parameter("gripper_velocity").as_double();
+      deadband_ = this->get_parameter("deadband").as_double();
+      dpad_vel_ = this->get_parameter("dpad_velocity").as_double();
+      gripper_vel_ = this->get_parameter("gripper_velocity").as_double();
+      max_vel_ = this->get_parameter("max_velocity").as_double();
+
 
       // Publishers
       if (sim_mode_) {
@@ -94,7 +93,6 @@ class ArmTeleopNode : public rclcpp::Node{
   private:
     bool enabled_= false;
     bool estopped_ = false;
-    bool fast_mode_= false;
     bool sim_mode_ = true;
     bool prev_btn_enable_= false;
     bool prev_btn_estop_ = false;
@@ -109,7 +107,7 @@ class ArmTeleopNode : public rclcpp::Node{
     int btn_enable_, btn_estop_, btn_rearm_, btn_speed_;
 
     // Velocity params
-    double max_vel_slow_, max_vel_fast_, deadband_, dpad_vel_, gripper_vel_;
+    double  max_vel_, deadband_, dpad_vel_, gripper_vel_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
 
@@ -184,12 +182,6 @@ class ArmTeleopNode : public rclcpp::Node{
         RCLCPP_INFO(this->get_logger(), "Re-armed. Press Cross to enable.");
       }
 
-      // L1: speed toggle
-      if (btn_speed && !prev_btn_speed_) {
-        fast_mode_ = !fast_mode_;
-        RCLCPP_INFO(this->get_logger(), "Speed: %s", fast_mode_ ? "FAST" : "SLOW");
-      }
-
       prev_btn_enable_ = btn_enable;
       prev_btn_estop_  = btn_estop;
       prev_btn_rearm_  = btn_rearm;
@@ -200,19 +192,34 @@ class ArmTeleopNode : public rclcpp::Node{
         return;
       }
 
-      double scale;
-      if (fast_mode_){
-        scale = max_vel_fast_;
-      }else {
-        scale = max_vel_slow_;
+      double scale = max_vel_; 
+
+      // left joystick domaninant axis lock
+      double left_x = deadband(msg->axes[axis_left_x_]) * scale;
+      double left_y = -deadband(msg->axes[axis_left_y_]) * scale;
+      double j1, j2;
+      if(std::abs(left_x) >= std::abs(left_y)){
+        j1 = left_x;
+        j2 = 0.0;
+      }else{
+        j1 = 0.0; 
+        j2 = left_y;
       }
 
-      double j1 =  deadband(msg->axes[axis_left_x_])  * scale;
-      double j2 = -deadband(msg->axes[axis_left_y_])  * scale;
-      double j3 =  deadband(msg->axes[axis_right_x_]) * scale;
-      double j4 = -deadband(msg->axes[axis_right_y_]) * scale;
-      double j5 =  msg->axes[axis_dpad_y_] * dpad_vel_;
-      double j6 =  msg->axes[axis_dpad_x_] * dpad_vel_;
+      // right joystick axis lock
+      double right_x = -deadband(msg->axes[axis_right_x_]) * scale;
+      double right_y = deadband(msg->axes[axis_right_y_]) * scale;
+      double j3, j4; 
+      if(std::abs(right_y) >= std::abs(right_x)){
+        j3 = right_y;
+        j4 = 0.0;
+      }else{
+        j3 = 0.0; 
+        j4 = right_x;
+      }
+
+      double j5 = msg->axes[axis_dpad_y_] * dpad_vel_;
+      double j6 = msg->axes[axis_dpad_x_] * dpad_vel_;
 
       double lt = normalize_trigger(msg->axes[axis_l2_]);
       double rt = normalize_trigger(msg->axes[axis_r2_]);
