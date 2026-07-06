@@ -218,8 +218,10 @@ class ArmTeleopNode : public rclcpp::Node{
         j4 = right_x;
       }
 
-      double j5 = msg->axes[axis_dpad_y_] * dpad_vel_;
-      double j6 = msg->axes[axis_dpad_x_] * dpad_vel_;
+      double pitch = msg->axes[axis_dpad_y] * dpad_vel_;
+      double roll = msg->sxes[axis_dpad_x] * dpad_vel_;
+      double j5 = pitch + roll; 
+      double j6 = pitch - roll;
 
       double lt = normalize_trigger(msg->axes[axis_l2_]);
       double rt = normalize_trigger(msg->axes[axis_r2_]);
