@@ -3,9 +3,15 @@
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
 #include <odrive_can/msg/control_message.hpp>
+#include <odrive_can/srv/axis_state.hpp>
+#include <std_srvs/srv/empty.hpp>
+#include <std_srvs/srv/trigger.hpp>
+#include <algorithm>
 
 constexpr int CONTROL_MODE_VELOCITY  = 2;
 constexpr int INPUT_MODE_PASSTHROUGH = 1;
+constexpr uint32_t AXIS_STATE_IDLE = 1;
+constexpr uint32_t AXIS_STATE_CLOSED_LOOP_CONTROL = 8;
 
 const std::vector<std::string> JOINT_TOPICS = {
   "/odrive_node_0/control_message",  // J1 - base
@@ -14,6 +20,11 @@ const std::vector<std::string> JOINT_TOPICS = {
   "/odrive_node_3/control_message",  // J4 - forearm
   "/odrive_node_4/control_message",  // J5 - wrist pitch
   "/odrive_node_5/control_message",  // J6 - wrist roll
+};
+
+const std::vector<std::string> ODRIVE_NODE_NS ={
+  "odrive_node_0", "odrive_node_1", "odrive_node_2",
+  "odrive_node_3", "odrive_node_4", "odrive_node_5",
 };
 
 class ArmTeleopNode : public rclcpp::Node{
@@ -34,7 +45,6 @@ class ArmTeleopNode : public rclcpp::Node{
       // Button params
       this->declare_parameter("btn_enable", 0);
       this->declare_parameter("btn_estop",  1);
-      this->declare_parameter("btn_rearm",  9);
       this->declare_parameter("btn_speed",  4);
 
       // Velocity params
@@ -56,7 +66,6 @@ class ArmTeleopNode : public rclcpp::Node{
       // Load button indices
       btn_enable_ = this->get_parameter("btn_enable").as_int();
       btn_estop_  = this->get_parameter("btn_estop").as_int();
-      btn_rearm_  = this->get_parameter("btn_rearm").as_int();
       btn_speed_  = this->get_parameter("btn_speed").as_int();
 
       // Load velocity params
@@ -65,6 +74,7 @@ class ArmTeleopNode : public rclcpp::Node{
       gripper_vel_ = this->get_parameter("gripper_velocity").as_double();
       max_vel_ = this->get_parameter("max_velocity").as_double();
 
+      joint_ready_.resize(ODRIVE_NODE_NS.size(), false);
 
       // Publishers
       if (sim_mode_) {
@@ -72,9 +82,17 @@ class ArmTeleopNode : public rclcpp::Node{
           "/forward_velocity_controller/commands", 10);
         RCLCPP_INFO(this->get_logger(), "Running in SIM mode.");
       } else {
-        for (const auto & topic : JOINT_TOPICS) {
+        for (const auto & topic : JOINT_TOPICS){
           joint_pubs_.push_back(
             this->create_publisher<odrive_can::msg::ControlMessage>(topic, 10));
+        }
+        for (const auto & ns: ODRIVE_NODE_NS){
+          axis_state_clients_.push_back(
+          this->create_client<odrive_can::srv::AxisState>(ns + "/request_axis_state")
+        );
+        clear_errors_clients_.push_back(
+          this->create_client<std_srvs::srv::Empty>(ns + "/clear_errors")
+        );
         }
         RCLCPP_INFO(this->get_logger(), "Running in REAL hardware mode.");
       }
@@ -82,11 +100,21 @@ class ArmTeleopNode : public rclcpp::Node{
       // Subscriber
       joy_sub_ = this->create_subscription<sensor_msgs::msg::Joy>(
         "/joy", 10,
-        std::bind(&ArmTeleopNode::joy_callback, this, std::placeholders::_1));
+        std::bind(&ArmTeleopNode::joy_callback, this, std::placeholders::_1)
+      );
+      
+      // recovery from estop is only on groundstation not controller
+      reset_estop_srv_ = this->create_service<std_srvs::srv::Trigger>(
+        "/reset_estop",
+        std::bind(&ArmTeleopNode::reset_estop_callback, this, std::placeholders::_1, std::placeholders::_2)
+      );
 
       RCLCPP_INFO(this->get_logger(),
         "Arm teleop ready. Cross to enable. Circle for e-stop. Options to re-arm.");
     }
+
+    rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_estop_srv_;
+
 
     ~ArmTeleopNode() { publish_zeros(); }
 
@@ -94,9 +122,9 @@ class ArmTeleopNode : public rclcpp::Node{
     bool enabled_= false;
     bool estopped_ = false;
     bool sim_mode_ = true;
+    bool rearm_pending_ = false;
     bool prev_btn_enable_= false;
     bool prev_btn_estop_ = false;
-    bool prev_btn_rearm_ = false;
     bool prev_btn_speed_ = false;
 
     // Axis indices
@@ -104,7 +132,7 @@ class ArmTeleopNode : public rclcpp::Node{
     int axis_l2_, axis_r2_, axis_dpad_x_, axis_dpad_y_;
 
     // Button indices
-    int btn_enable_, btn_estop_, btn_rearm_, btn_speed_;
+    int btn_enable_, btn_estop_, btn_speed_;
 
     // Velocity params
     double  max_vel_, deadband_, dpad_vel_, gripper_vel_;
@@ -116,6 +144,11 @@ class ArmTeleopNode : public rclcpp::Node{
 
     // Real hardware publishers
     std::vector<rclcpp::Publisher<odrive_can::msg::ControlMessage>::SharedPtr> joint_pubs_;
+
+    // Real hardware state controllers (estop and rearm)
+    std::vector<rclcpp::Client<odrive_can::srv::AxisState>::SharedPtr> axis_state_clients_;
+    std::vector<rclcpp::Client<std_srvs::srv::Empty>::SharedPtr>       clear_errors_clients_;
+    std::vector<bool> joint_ready_;
 
     double deadband(double val) const{
       if (std::abs(val) > deadband_){
@@ -146,16 +179,109 @@ class ArmTeleopNode : public rclcpp::Node{
         msg.data = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
         sim_pub_->publish(msg);
       }else{
-        for (size_t i = 0; i < joint_pubs_.size(); ++i) {
+        for (size_t i = 0; i < joint_pubs_.size(); ++i){
           publish_velocity(i, 0.0);
         }
       }
     }
 
+    void request_all_axis_states(uint32_t state){
+      if(sim_mode_){
+        return; 
+      }
+      auto request = std::make_shared<odrive_can::srv::AxisState::Request>();
+      request->axis_requested_state = state;
+      for(size_t i = 0; i < axis_state_clients_.size(); ++i){
+        if(!axis_state_clients_[i]->service_is_ready()){
+          RCLCPP_WARN(this->get_logger(), "Joint %zu axis_state service not available", i);
+          continue;
+        }
+        axis_state_clients_[i]->async_send_request(
+          request,
+          [this, i](rclcpp::Client<odrive_can::srv::AxisState>::SharedFuture future){
+            auto result = future.get();
+            if(result->procedure_result != 0){
+              RCLCPP_ERROR(this->get_logger(),
+                "Joint %zu failed to reach requested state (procedure_result=%u, active_errors=0x%x)",
+                i, result->procedure_result, result->active_errors);
+            }
+          }
+        );
+      }
+    }
+
+    void begin_rearm_sequence(){
+      if(sim_mode_){
+        estopped_ = false;
+        RCLCPP_INFO(this->get_logger(), "Re-armed in sim");
+        return;
+      }
+      rearm_pending_ = true;
+      std::fill(joint_ready_.begin(), joint_ready_.end(), false);
+      RCLCPP_INFO(this->get_logger(), "Re-arm requested, waiting for joint confirmation");
+      for(size_t i = 0; i < clear_errors_clients_.size(); ++i){
+        request_joint_rearm(i);
+      }
+    }
+
+    void request_joint_rearm(size_t i){
+      if (!clear_errors_clients_[i]->service_is_ready()){
+        RCLCPP_WARN(this->get_logger(), "Joint %zu clear_errors not available yet", i);
+        return;
+      }
+      auto empty_req = std::make_shared<std_srvs::srv::Empty::Request>();
+      clear_errors_clients_[i]->async_send_request(
+        empty_req,
+        [this, i](rclcpp::Client<std_srvs::srv::Empty>::SharedFuture){
+          if (!axis_state_clients_[i]->service_is_ready()) return;
+          auto state_req = std::make_shared<odrive_can::srv::AxisState::Request>();
+          state_req->axis_requested_state = AXIS_STATE_CLOSED_LOOP_CONTROL;
+          axis_state_clients_[i]->async_send_request(state_req,
+            [this, i](rclcpp::Client<odrive_can::srv::AxisState>::SharedFuture future){
+              auto result = future.get();
+              if (result->procedure_result == 0 && result->axis_state == AXIS_STATE_CLOSED_LOOP_CONTROL){
+                joint_ready_[i] = true;
+                RCLCPP_INFO(this->get_logger(), "Joint %zu confirmed closed-loop.", i);
+                check_rearm_complete();
+              } else {
+                RCLCPP_ERROR(this->get_logger(),
+                  "Joint %zu did NOT reach closed-loop (procedure_result=%u, axis_state=%u, active_errors=0x%x)",
+                  i, result->procedure_result, result->axis_state, result->active_errors);
+              }
+            });
+        });
+    }
+
+    void check_rearm_complete(){
+      if (std::all_of(joint_ready_.begin(), joint_ready_.end(), [](bool b){ return b; })){
+        estopped_ = false;
+        rearm_pending_ = false;
+        RCLCPP_INFO(this->get_logger(), "All joints confirmed. Re-armed. Press Cross to enable.");
+      }
+    }
+
+    // only from the groundstation only not available fro the controller
+    void reset_estop_callback(
+       const std::shared_ptr<std_srvs::srv::Trigger::Request>,
+        std::shared_ptr<std_srvs::srv::Trigger::Response> response){
+      if (!estopped_){
+        response->success = false;
+        response->message = "Not e-stopped.";
+        return;
+      }
+      if (rearm_pending_){
+        response->success = false;
+        response->message = "Re-arm already in progress.";
+        return;
+      }
+      begin_rearm_sequence();
+      response->success = true;
+      response->message = "Re-arm sequence started — check node logs for per-joint confirmation.";
+    }
+
     void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg){
       bool btn_enable = msg->buttons[btn_enable_];
       bool btn_estop  = msg->buttons[btn_estop_];
-      bool btn_rearm  = msg->buttons[btn_rearm_];
       bool btn_speed  = msg->buttons[btn_speed_];
 
       // Cross: toggle enable
@@ -164,27 +290,23 @@ class ArmTeleopNode : public rclcpp::Node{
           enabled_ = !enabled_;
           RCLCPP_INFO(this->get_logger(), "Teleop %s", enabled_ ? "ENABLED" : "DISABLED");
         } else {
-          RCLCPP_WARN(this->get_logger(), "E-stop active — press Options to re-arm first.");
+          RCLCPP_WARN(this->get_logger(), "E-stop active.");
         }
       }
 
       // Circle: e-stop
       if (btn_estop && !prev_btn_estop_){
-        estopped_ = true;
-        enabled_  = false;
+        estopped_      = true;
+        enabled_       = false;
+        rearm_pending_ = false;
+        std::fill(joint_ready_.begin(), joint_ready_.end(), false);
         publish_zeros();
-        RCLCPP_ERROR(this->get_logger(), "E-STOP! Press Options to re-arm.");
-      }
-
-      // Options: re-arm
-      if (btn_rearm && !prev_btn_rearm_ && estopped_){
-        estopped_ = false;
-        RCLCPP_INFO(this->get_logger(), "Re-armed. Press Cross to enable.");
+        request_all_axis_states(AXIS_STATE_IDLE);
+        RCLCPP_ERROR(this->get_logger(), "E-STOP! All joints commanded IDLE. Recovery via reset_estop service only.");
       }
 
       prev_btn_enable_ = btn_enable;
       prev_btn_estop_  = btn_estop;
-      prev_btn_rearm_  = btn_rearm;
       prev_btn_speed_  = btn_speed;
 
       if (!enabled_ || estopped_){
@@ -218,11 +340,11 @@ class ArmTeleopNode : public rclcpp::Node{
         j4 = right_x;
       }
 
-      double pitch = msg->axes[axis_dpad_y] * dpad_vel_;
-      double roll = msg->sxes[axis_dpad_x] * dpad_vel_;
+      double pitch = msg->axes[axis_dpad_y_] * dpad_vel_;
+      double roll = msg->axes[axis_dpad_x_] * dpad_vel_;
       double j5 = pitch + roll; 
       double j6 = pitch - roll;
-
+ 
       double lt = normalize_trigger(msg->axes[axis_l2_]);
       double rt = normalize_trigger(msg->axes[axis_r2_]);
       double gripper = (lt - rt) * gripper_vel_;  // + = close, - = open
@@ -243,7 +365,7 @@ class ArmTeleopNode : public rclcpp::Node{
       // TODO: wire gripper to its actual topic
       (void)gripper;
     }
-};
+  };
 
 int main(int argc, char * argv[]){
   rclcpp::init(argc, argv);

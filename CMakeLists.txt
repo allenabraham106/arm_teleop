@@ -10,6 +10,7 @@ find_package(rclcpp REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
+find_package(std_srvs REQUIRED)
 
 add_executable(arm_teleop_node src/arm_teleop_node.cpp)
 
@@ -25,6 +26,7 @@ ament_target_dependencies(arm_teleop_node
   rclcpp
   sensor_msgs
   std_msgs
+  std_srvs
   odrive_can
 )
 
