@@ -98,6 +98,15 @@ double ArmTeleopNode::normalize_trigger(double raw) const{
   return (raw + 1.0) / 2.0;
 }
 
+// joystick dominant possession
+std::pair<double, double> ArmTeleopNode::dominant_axis_lock(double x, double y) const{
+  if(std::abs(x) >= std::abs(y)){
+    return {x, 0};
+  }else{
+   return {0, y};
+ }
+}
+
 void ArmTeleopNode::publish_velocity(size_t joint_idx, double velocity){
   if (joint_idx >= joint_pubs_.size()) return;
   odrive_can::msg::ControlMessage msg;
@@ -252,35 +261,25 @@ void ArmTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg){
 
   double scale = max_vel_;
 
-  // left joystick domaninant axis lock
   double left_x = deadband(msg->axes[axis_left_x_]) * scale;
   double left_y = -deadband(msg->axes[axis_left_y_]) * scale;
-  double j1, j2;
-  if(std::abs(left_x) >= std::abs(left_y)){
-    j1 = left_x;
-    j2 = 0.0;
-  }else{
-    j1 = 0.0;
-    j2 = left_y;
-  }
+  auto [j1, j2] = dominant_axis_lock(left_x, left_y);
 
-  // right joystick axis lock
   double right_x = -deadband(msg->axes[axis_right_x_]) * scale;
   double right_y = deadband(msg->axes[axis_right_y_]) * scale;
-  double j3, j4;
-  if(std::abs(right_y) >= std::abs(right_x)){
-    j3 = right_y;
-    j4 = 0.0;
-  }else{
-    j3 = 0.0;
-    j4 = right_x;
-  }
+  auto [j3, j4] = dominant_axis_lock(right_y, right_x);
 
   double pitch = msg->axes[axis_dpad_y_] * dpad_vel_;
   double roll = msg->axes[axis_dpad_x_] * dpad_vel_;
   double j5 = pitch + roll;
   double j6 = pitch - roll;
 
+  double largest = std::max(std::abs(j5), std::abs(j6));
+  if (largest > dpad_vel_){
+    double norm = dpad_vel_ / largest;
+    j5 *= norm;
+    j6 *= norm;
+  }
   double lt = normalize_trigger(msg->axes[axis_l2_]);
   double rt = normalize_trigger(msg->axes[axis_r2_]);
   double gripper = (lt - rt) * gripper_vel_;  // + = close, - = open

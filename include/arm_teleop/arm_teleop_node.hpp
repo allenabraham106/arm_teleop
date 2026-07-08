@@ -12,6 +12,7 @@
 #include <algorithm>
 #include <string>
 #include <vector>
+#include <utility>
 
 constexpr int CONTROL_MODE_VELOCITY  = 2;
 constexpr int INPUT_MODE_PASSTHROUGH = 1;
@@ -74,6 +75,7 @@ class ArmTeleopNode : public rclcpp::Node{
 
     double deadband(double val) const;
     double normalize_trigger(double raw) const;
+    std::pair<double, double> dominant_axis_lock(double x, double y) const;
     void publish_velocity(size_t joint_idx, double velocity);
     void publish_zeros();
     void request_all_axis_states(uint32_t state);
