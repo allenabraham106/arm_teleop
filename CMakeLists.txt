@@ -13,8 +13,9 @@ find_package(odrive_can REQUIRED)
 find_package(std_srvs REQUIRED)
 
 add_executable(arm_teleop_node src/arm_teleop_node.cpp)
-
+target_include_directories(arm_teleop_node PRIVATE include)
 add_executable(arm_joint_sim_node src/arm_joint_sim_node.cpp)
+
 
 ament_target_dependencies(arm_joint_sim_node
   rclcpp
