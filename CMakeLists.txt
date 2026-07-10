@@ -15,6 +15,8 @@ find_package(std_srvs REQUIRED)
 add_executable(arm_teleop_node src/arm_teleop_node.cpp)
 target_include_directories(arm_teleop_node PRIVATE include)
 add_executable(arm_joint_sim_node src/arm_joint_sim_node.cpp)
+add_executable(arm_safety_node src/arm_safety_node.cpp)
+target_include_directories(arm_safety_node PRIVATE include)
 
 
 ament_target_dependencies(arm_joint_sim_node
@@ -31,7 +33,14 @@ ament_target_dependencies(arm_teleop_node
   odrive_can
 )
 
-install(TARGETS arm_teleop_node arm_joint_sim_node
+ament_target_dependencies(arm_safety_node
+  rclcpp
+  std_msgs
+  std_srvs
+  odrive_can
+)
+
+install(TARGETS arm_teleop_node arm_joint_sim_node arm_safety_node
   DESTINATION lib/${PROJECT_NAME}
 )
 
