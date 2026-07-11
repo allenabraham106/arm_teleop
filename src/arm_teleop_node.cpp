@@ -160,7 +160,7 @@ void ArmTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg){
   auto [j1, j2] = dominant_axis_lock(left_x, left_y);
 
   double right_x = -deadband(msg->axes[axis_right_x_]) * scale;
-  double right_y = deadband(msg->axes[axis_right_y_]) * scale;
+  double right_y = -deadband(msg->axes[axis_right_y_]) * scale;
   auto [j3, j4] = dominant_axis_lock(right_y, right_x);
 
   double pitch = msg->axes[axis_dpad_y_] * dpad_vel_;
