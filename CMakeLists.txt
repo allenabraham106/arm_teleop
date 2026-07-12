@@ -11,6 +11,13 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(odrive_can REQUIRED)
 find_package(std_srvs REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
+find_package(controller_manager_msgs REQUIRED)
+
+rosidl_generate_interfaces(${PROJECT_NAME}
+  "msg/EstopStatus.msg"
+)
+rosidl_get_typesupport_target(cpp_typesupport_target ${PROJECT_NAME} "rosidl_typesupport_cpp")
 
 add_executable(arm_teleop_node src/arm_teleop_node.cpp)
 target_include_directories(arm_teleop_node PRIVATE include)
@@ -38,7 +45,11 @@ ament_target_dependencies(arm_safety_node
   std_msgs
   std_srvs
   odrive_can
+  controller_manager_msgs
 )
+
+target_link_libraries(arm_teleop_node "${cpp_typesupport_target}")
+target_link_libraries(arm_safety_node "${cpp_typesupport_target}")
 
 install(TARGETS arm_teleop_node arm_joint_sim_node arm_safety_node
   DESTINATION lib/${PROJECT_NAME}

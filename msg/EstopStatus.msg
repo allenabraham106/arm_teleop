@@ -1,0 +1,2 @@
+bool estopped
+bool rearm_pending

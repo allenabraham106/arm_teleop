@@ -57,7 +57,7 @@ ArmTeleopNode::ArmTeleopNode() : Node("arm_teleop_node"){
 
   rclcpp::QoS latched_qos(1);
   latched_qos.transient_local();
-  estopped_sub_ = this->create_subscription<std_msgs::msg::Bool>(
+  estopped_sub_ = this->create_subscription<arm_teleop::msg::EstopStatus>(
     "estopped",
     latched_qos,
     std::bind(&ArmTeleopNode::estopped_callback, this, std::placeholders::_1)
@@ -104,8 +104,9 @@ void ArmTeleopNode::publish_zeros(){
   vel_pub_->publish(msg);
 }
 
-void ArmTeleopNode::estopped_callback(const std_msgs::msg::Bool::SharedPtr msg){
-  estopped_ = msg->data;
+void ArmTeleopNode::estopped_callback(const arm_teleop::msg::EstopStatus::SharedPtr msg){
+  estopped_ = msg->estopped;
+  rearm_pending_ = msg->rearm_pending;
 }
 
 void ArmTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg){
@@ -119,7 +120,10 @@ void ArmTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg){
       enabled_ = !enabled_;
       RCLCPP_INFO(this->get_logger(), "Teleop %s", enabled_ ? "ENABLED" : "DISABLED");
     } else {
-      RCLCPP_WARN(this->get_logger(), "E-stop active.");
+      RCLCPP_WARN(this->get_logger(), rearm_pending_
+        ? "E-stop latched, re-arm already in progress."
+        : "E-stop latched. Recovery is via arm_safety_node's reset_estop service, not a controller button."
+      );
     }
   }
 

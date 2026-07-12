@@ -2,33 +2,27 @@
 #define ARM_TELEOP__ARM_SAFETY_NODE_HPP_
 
 #include <rclcpp/rclcpp.hpp>
-#include <std_msgs/msg/bool.hpp>
+#include "arm_teleop/msg/estop_status.hpp"
 #include <std_srvs/srv/trigger.hpp>
 #include <controller_manager_msgs/srv/set_hardware_component_state.hpp>
 #include <algorithm>
 #include <string>
 #include <vector>
 
-const std::string ARM_HARDWARE_COMPONENT = "ArmSystem"
-const std::vector<std::string> ODRIVE_NODE_NS = {
-  "odrive_node_0", "odrive_node_1", "odrive_node_2",
-  "odrive_node_3", "odrive_node_4", "odrive_node_5",
-};
+const std::string ARM_HARDWARE_COMPONENT = "ArmSystem";
 
 class ArmSafetyNode : public rclcpp::Node{
   public:
     ArmSafetyNode();
 
   private:
-    bool sim_mode_ = true;
     bool estopped_ = false;
     bool rearm_pending_ = false;
 
-    rclcpp::Publisher<std_msgs::msg::Bool>::SharedPtr estopped_pub_;
+    rclcpp::Publisher<arm_teleop::msg::EstopStatus>::SharedPtr estopped_pub_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr estop_srv_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_estop_srv_;
-    rclcpp::Client<controller_manager_srvs::srv::SetHardwareComponentState>::SharedPtr hw_state_client_;
-
+    rclcpp::Client<controller_manager_msgs::srv::SetHardwareComponentState>::SharedPtr hw_state_client_;
     void publish_estopped_status();
     void begin_rearm_sequence();
     void set_hardware_state(const std::string & label);

@@ -5,7 +5,7 @@
 #include <sensor_msgs/msg/joy.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
-#include <std_msgs/msg/bool.hpp>
+#include "arm_teleop/msg/estop_status.hpp"
 #include <std_srvs/srv/trigger.hpp>
 #include <utility>
 #include <string>
@@ -24,6 +24,7 @@ class ArmTeleopNode : public rclcpp::Node{
   private:
     bool enabled_= false;
     bool estopped_ = false;
+    bool rearm_pending_ = false;
     bool prev_btn_enable_= false;
     bool prev_btn_estop_ = false;
     bool prev_btn_speed_ = false;
@@ -39,11 +40,9 @@ class ArmTeleopNode : public rclcpp::Node{
     double  max_vel_, deadband_, dpad_vel_, gripper_vel_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
-    rclcpp::Subscription<std_msgs::msg::Bool>::SharedPtr estopped_sub_;
-
+    rclcpp::Subscription<arm_teleop::msg::EstopStatus>::SharedPtr estopped_sub_;
     // Sim mode publisher (also used for real hardware, once arm_bringup's
-    // real-hardware launch exists — same forward_velocity_controller topic
-    // either way. See ros2_control follow-up.)
+    // real-hardware launch exists)
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr vel_pub_;
 
     rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr estop_client_;
@@ -52,7 +51,7 @@ class ArmTeleopNode : public rclcpp::Node{
     double normalize_trigger(double raw) const;
     std::pair<double, double> dominant_axis_lock(double x, double y) const;
     void publish_zeros();
-    void estopped_callback(const std_msgs::msg::Bool::SharedPtr msg);
+    void estopped_callback(const arm_teleop::msg::EstopStatus::SharedPtr msg);
     void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg);
 };
 
