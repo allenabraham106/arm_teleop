@@ -16,13 +16,14 @@ constexpr uint32_t INPUT_MODE_PASSTHROUGH = 1;
 
 class ArmTeleopNode : public rclcpp::Node{
   public:
+    // Declares params, sets up joy sub, vel sub, and estop client
     ArmTeleopNode();
+    // Publishes 0 velocity on shutdown
     ~ArmTeleopNode();
 
   private:
     bool enabled_= false;
     bool estopped_ = false;
-    bool sim_mode_ = true;
     bool prev_btn_enable_= false;
     bool prev_btn_estop_ = false;
     bool prev_btn_speed_ = false;
