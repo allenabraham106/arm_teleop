@@ -14,10 +14,7 @@
   <depend>odrive_can</depend>
   <depend>std_srvs</depend>
   <depend>controller_manager_msgs</depend>
-  <buildtool_depend>rosidl_default_generators</buildtool_depend>
-  <exec_depend>rosidl_default_runtime</exec_depend>
-  <member_of_group>rosidl_interface_packages</member_of_group>
-
+  <depend>arm_teleop_messages</depend>
 
   <export>
     <build_type>ament_cmake</build_type>

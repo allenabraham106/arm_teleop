@@ -5,7 +5,7 @@
 #include <sensor_msgs/msg/joy.hpp>
 #include <sensor_msgs/msg/joint_state.hpp>
 #include <std_msgs/msg/float64_multi_array.hpp>
-#include "arm_teleop/msg/estop_status.hpp"
+#include <arm_teleop_messages/msg/estop_status.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <utility>
 #include <string>
@@ -40,7 +40,7 @@ class ArmTeleopNode : public rclcpp::Node{
     double  max_vel_, deadband_, dpad_vel_, gripper_vel_;
 
     rclcpp::Subscription<sensor_msgs::msg::Joy>::SharedPtr joy_sub_;
-    rclcpp::Subscription<arm_teleop::msg::EstopStatus>::SharedPtr estopped_sub_;
+    rclcpp::Subscription<arm_teleop_messages::msg::EstopStatus>::SharedPtr estopped_sub_;
     // Sim mode publisher (also used for real hardware, once arm_bringup's
     // real-hardware launch exists)
     rclcpp::Publisher<std_msgs::msg::Float64MultiArray>::SharedPtr vel_pub_;
@@ -51,7 +51,7 @@ class ArmTeleopNode : public rclcpp::Node{
     double normalize_trigger(double raw) const;
     std::pair<double, double> dominant_axis_lock(double x, double y) const;
     void publish_zeros();
-    void estopped_callback(const arm_teleop::msg::EstopStatus::SharedPtr msg);
+    void estopped_callback(const arm_teleop_messages::msg::EstopStatus::SharedPtr msg);
     void joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg);
 };
 

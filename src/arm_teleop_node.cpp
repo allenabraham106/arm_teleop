@@ -57,7 +57,7 @@ ArmTeleopNode::ArmTeleopNode() : Node("arm_teleop_node"){
 
   rclcpp::QoS latched_qos(1);
   latched_qos.transient_local();
-  estopped_sub_ = this->create_subscription<arm_teleop::msg::EstopStatus>(
+  estopped_sub_ = this->create_subscription<arm_teleop_messages::msg::EstopStatus>(
     "estopped",
     latched_qos,
     std::bind(&ArmTeleopNode::estopped_callback, this, std::placeholders::_1)
@@ -104,7 +104,7 @@ void ArmTeleopNode::publish_zeros(){
   vel_pub_->publish(msg);
 }
 
-void ArmTeleopNode::estopped_callback(const arm_teleop::msg::EstopStatus::SharedPtr msg){
+void ArmTeleopNode::estopped_callback(const arm_teleop_messages::msg::EstopStatus::SharedPtr msg){
   estopped_ = msg->estopped;
   rearm_pending_ = msg->rearm_pending;
 }

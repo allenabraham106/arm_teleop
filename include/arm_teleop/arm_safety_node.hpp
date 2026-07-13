@@ -2,7 +2,7 @@
 #define ARM_TELEOP__ARM_SAFETY_NODE_HPP_
 
 #include <rclcpp/rclcpp.hpp>
-#include "arm_teleop/msg/estop_status.hpp"
+#include <arm_teleop_messages/msg/estop_status.hpp>
 #include <std_srvs/srv/trigger.hpp>
 #include <controller_manager_msgs/srv/set_hardware_component_state.hpp>
 #include <algorithm>
@@ -19,7 +19,7 @@ class ArmSafetyNode : public rclcpp::Node{
     bool estopped_ = false;
     bool rearm_pending_ = false;
 
-    rclcpp::Publisher<arm_teleop::msg::EstopStatus>::SharedPtr estopped_pub_;
+    rclcpp::Publisher<arm_teleop_messages::msg::EstopStatus>::SharedPtr estopped_pub_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr estop_srv_;
     rclcpp::Service<std_srvs::srv::Trigger>::SharedPtr reset_estop_srv_;
     rclcpp::Client<controller_manager_msgs::srv::SetHardwareComponentState>::SharedPtr hw_state_client_;

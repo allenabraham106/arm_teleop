@@ -6,7 +6,7 @@ ArmSafetyNode::ArmSafetyNode() : Node("arm_safety_node"){
 
   rclcpp::QoS latched_qos(1);
   latched_qos.transient_local();
-  estopped_pub_ = this->create_publisher<arm_teleop::msg::EstopStatus>("estopped", latched_qos);
+  estopped_pub_ = this->create_publisher<arm_teleop_messages::msg::EstopStatus>("estopped", latched_qos);
 
   estop_srv_ = this->create_service<std_srvs::srv::Trigger>(
     "estop",
@@ -22,7 +22,7 @@ ArmSafetyNode::ArmSafetyNode() : Node("arm_safety_node"){
 }
 
 void ArmSafetyNode::publish_estopped_status(){
-  arm_teleop::msg::EstopStatus msg;
+  arm_teleop_messages::msg::EstopStatus msg;
   msg.estopped = estopped_;
   msg.rearm_pending = rearm_pending_;
   estopped_pub_->publish(msg);
