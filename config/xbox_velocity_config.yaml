@@ -1,6 +1,5 @@
 arm_teleop_node:
   ros__parameters:
-    sim_mode: true
     max_velocity: 1.5
     deadband: 0.08
     dpad_velocity: 0.3
