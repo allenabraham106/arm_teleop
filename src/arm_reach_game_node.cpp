@@ -8,6 +8,7 @@
 ArmReachGameNode::ArmReachGameNode() : Node("arm_reach_game_node"){
     tf_buffer_ = std::make_unique<tf2_ros::Buffer>(this->get_clock());
     tf_listener_ = std::make_shared<tf2_ros::TransformListener>(*tf_buffer_);
+    leg_start_time_ = this->now();
 
     // TODO: Confirm that the options button is the correct mapping
     this->declare_parameter("btn_stop", 7);
