@@ -20,7 +20,7 @@ ArmReachGameNode::ArmReachGameNode() : Node("arm_reach_game_node"){
     this->declare_parameter("box_b_x", 0.2);
     this->declare_parameter("box_b_y", -0.22);
     this->declare_parameter("box_b_z", 0.15);
-    this->declare_parameter("hit_radius", 0.05);
+    this->declare_parameter("hit_radius", 0.15);
 
     btn_stop_ = this->get_parameter("btn_stop").as_int();
     base_frame_ = this->get_parameter("base_frame").as_string();
@@ -72,7 +72,10 @@ void ArmReachGameNode::timer_callback(){
     if(game_stopped_){
         return;
     }
-    publish_markers();
+    static int marker_counter = 0;
+    if (marker_counter++ % 6 == 0){
+        publish_markers();
+    }
 
     geometry_msgs::msg::TransformStamped tf;
     try{
