@@ -99,7 +99,7 @@ std::pair<double, double> ArmTeleopNode::dominant_axis_lock(double x, double y) 
 void ArmTeleopNode::publish_zeros(){
   std_msgs::msg::Float64MultiArray msg;
   msg.data = {
-    0.0
+    0.0, 0.0, 0.0, 0.0, 0.0, 0.0
   };
   vel_pub_->publish(msg);
 }
@@ -159,12 +159,35 @@ void ArmTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg){
 
   double scale = max_vel_;
 
+  double left_x = deadband(msg->axes[axis_left_x_]) * scale;
+  double left_y = -deadband(msg->axes[axis_left_y_]) * scale;
+  auto [j1, j2] = dominant_axis_lock(left_x, left_y);
+
   double right_x = -deadband(msg->axes[axis_right_x_]) * scale;
-  double j4 = right_x;
+  double right_y = -deadband(msg->axes[axis_right_y_]) * scale;
+  auto [j3, j4] = dominant_axis_lock(right_y, right_x);
+
+  double pitch = msg->axes[axis_dpad_y_] * dpad_vel_;
+  double roll = msg->axes[axis_dpad_x_] * dpad_vel_;
+  double j5 = pitch + roll;
+  double j6 = pitch - roll;
+
+  double largest = std::max(std::abs(j5), std::abs(j6));
+  if (largest > dpad_vel_){
+    double norm = dpad_vel_ / largest;
+    j5 *= norm;
+    j6 *= norm;
+  }
+  double lt = normalize_trigger(msg->axes[axis_l2_]);
+  double rt = normalize_trigger(msg->axes[axis_r2_]);
+  double gripper = (lt - rt) * gripper_vel_;  // + = close, - = open
 
   std_msgs::msg::Float64MultiArray vel_msg;
-  vel_msg.data = {j4};
+  vel_msg.data = {j1, j2, j3, j4, j5, j6};
   vel_pub_->publish(vel_msg);
+
+  // TODO: wire gripper to its actual topic
+  (void)gripper;
 }
 
 int main(int argc, char * argv[]){
