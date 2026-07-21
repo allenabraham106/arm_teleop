@@ -162,10 +162,10 @@ void ArmTeleopNode::joy_callback(const sensor_msgs::msg::Joy::SharedPtr msg){
   double left_x = deadband(msg->axes[axis_left_x_]) * scale;
   double left_y = -deadband(msg->axes[axis_left_y_]) * scale;
   auto [j1, j2] = dominant_axis_lock(left_x, left_y);
-
+  
   double right_x = -deadband(msg->axes[axis_right_x_]) * scale;
   double right_y = -deadband(msg->axes[axis_right_y_]) * scale;
-  auto [j3, j4] = dominant_axis_lock(right_y, right_x);
+  auto [j3, j4] = dominant_axis_lock(right_x, right_y);
 
   double pitch = msg->axes[axis_dpad_y_] * dpad_vel_;
   double roll = msg->axes[axis_dpad_x_] * dpad_vel_;

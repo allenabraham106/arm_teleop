@@ -17,9 +17,9 @@ ArmReachGameNode::ArmReachGameNode() : Node("arm_reach_game_node"){
     this->declare_parameter("box_a_x", 0.3);
     this->declare_parameter("box_a_y", 0.2);
     this->declare_parameter("box_a_z", 0.3);
-    this->declare_parameter("box_b_x", 0.3);
-    this->declare_parameter("box_b_y", -0.2);
-    this->declare_parameter("box_b_z", 0.3);
+    this->declare_parameter("box_b_x", 0.2);
+    this->declare_parameter("box_b_y", -0.22);
+    this->declare_parameter("box_b_z", 0.15);
     this->declare_parameter("hit_radius", 0.05);
 
     btn_stop_ = this->get_parameter("btn_stop").as_int();
